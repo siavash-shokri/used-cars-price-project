@@ -1,47 +1,115 @@
+-- Used Cars Market Analysis
+-- PostgreSQL data loading, cleaning, and exploratory analysis
+
+
+-- ============================================================
+-- 1. Load and Prepare Data
+-- ============================================================
+
+DROP TABLE IF EXISTS used_cars;
+
 CREATE TABLE used_cars (
 id BIGSERIAL NOT NULL PRIMARY KEY,
-brand VARCHAR(50),
-model VARCHAR(150),
-model_year INTEGER,
-milage VARCHAR(50),
-fuel_type VARCHAR(50),
-engine VARCHAR(150),
-transmission VARCHAR(50),
-ext_col VARCHAR(50),
-int_col VARCHAR(50),
-accident VARCHAR(100),
-clean_title VARCHAR(20),
-price VARCHAR(50));
+brand TEXT,
+model TEXT,
+model_year TEXT,
+milage TEXT,
+fuel_type TEXT,
+engine TEXT,
+transmission TEXT,
+ext_col TEXT,
+int_col TEXT,
+accident TEXT,
+clean_title TEXT,
+price TEXT);
 
-\copy used_cars(brand, model, model_year, milage, fuel_type, engine, transmission, ext_col, int_col, accident, clean_title, price)
-FROM '/home/fruckman/DataAnalysis/used_cars.csv'
-DELIMITER ',' CSV HEADER;
-ERROR:  value too long for type character varying(50)
-CONTEXT:  COPY used_cars, line 765, column transmission: "Automatic, 8-Spd M STEPTRONIC w/Drivelogic, Sport & Manual Modes"
+\copy used_cars(brand, model, model_year, milage, fuel_type, engine, transmission, ext_col, int_col, accident, clean_title, price) FROM '/home/fruckman/DataAnalysis/used-cars-price-project/data/used_cars.csv' DELIMITER ',' CSV HEADER;
 
-test=> ALTER TABLE used_cars
-ALTER COLUMN brand TYPE TEXT,
-ALTER COLUMN model TYPE TEXT,
-ALTER COLUMN model_year TYPE TEXT,
-ALTER COLUMN milage TYPE TEXT,
-ALTER COLUMN fuel_type TYPE TEXT,
-ALTER COLUMN engine TYPE TEXT,
-ALTER COLUMN transmission TYPE TEXT,
-ALTER COLUMN ext_col TYPE TEXT,
-ALTER COLUMN int_col TYPE TEXT,
-ALTER COLUMN accident TYPE TEXT,
-ALTER COLUMN clean_title TYPE TEXT,
-ALTER COLUMN price TYPE TEXT;
+ALTER TABLE used_cars 
+ALTER COLUMN price TYPE NUMERIC 
+USING NULLIF(REPLACE(REPLACE(TRIM(price), '$', ''), ',', ''), '')::NUMERIC;
 
-\copy used_cars(brand, model, model_year, milage, fuel_type, engine, transmission, ext_col, int_col, accident, clean_title, price)
-FROM '/home/fruckman/DataAnalysis/used_cars.csv'
-DELIMITER ',' CSV HEADER;
+ALTER TABLE used_cars 
+ALTER COLUMN milage TYPE INTEGER 
+USING NULLIF(REPLACE(REPLACE(TRIM(milage), 'mi.', ''), ',', ''), '')::INTEGER;
+
+ALTER TABLE used_cars 
+ALTER COLUMN model_year TYPE INTEGER USING model_year::INTEGER;
+
+
+-- ============================================================
+-- 2. Basic Dataset Checks
+-- ============================================================
 
 SELECT COUNT(*) FROM used_cars;
 
-SELECT COUNT(DISTINCT brand) FROM used_cars;
-
-SELECT COUNT(*) FROM used_cars WHERE fuel_type IS NULL;
-
+SELECT MIN(model_year), MAX(model_year) 
+FROM used_cars;
 
 
+-- ============================================================
+-- 3. Frequency Analysis
+-- ============================================================
+
+SELECT brand, COUNT(id) AS cnt 
+FROM used_cars 
+GROUP BY brand 
+ORDER BY cnt DESC
+FETCH FIRST 10 ROWS ONLY;
+
+SELECT model, COUNT(id) AS cnt 
+FROM used_cars 
+GROUP BY model 
+ORDER BY cnt DESC
+FETCH FIRST 10 ROWS ONLY;
+
+
+-- ============================================================
+-- 4. Market Price Analysis
+-- ============================================================
+
+SELECT brand, 
+percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median_price 
+FROM used_cars 
+GROUP BY brand 
+ORDER BY median_price DESC;
+
+SELECT fuel_type, 
+percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median_price 
+FROM used_cars 
+GROUP BY fuel_type 
+ORDER BY median_price DESC;
+
+SELECT accident, 
+percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median_price 
+FROM used_cars 
+GROUP BY accident 
+ORDER BY median_price DESC;
+
+SELECT model_year, 
+percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median_price 
+FROM used_cars 
+GROUP BY model_year 
+ORDER BY median_price DESC;
+
+
+-- ============================================================
+-- 5. Mileage Analysis
+-- ============================================================
+
+SELECT brand, 
+AVG(milage) AS avg_milage
+FROM used_cars 
+GROUP BY brand 
+ORDER BY avg_milage DESC;
+
+
+-- ============================================================
+-- 6. Missing Value Check
+-- ============================================================
+
+SELECT
+    COUNT(*) FILTER (WHERE fuel_type IS NULL) AS missing_fuel_type,
+    COUNT(*) FILTER (WHERE accident IS NULL) AS missing_accident,
+    COUNT(*) FILTER (WHERE clean_title IS NULL) AS missing_clean_title
+FROM used_cars;
